@@ -891,7 +891,7 @@
           <div id="infoPanel" class="command-list-panel" hidden>
             <div class="cmd-item">Site Admin: 타로수 Tarosu</div>
             <div class="cmd-item">Contact: tarosu.ooa@gmail.com</div>
-            <div class="cmd-item">Version: 0.0.1</div>
+            <div class="cmd-item">Version: v0.0.2</div>
           </div>
         </span>
       </div>
@@ -900,7 +900,7 @@
     <div class="tool-group">
       <span class="group-label">기호 / 편집</span>
       <div class="btn-row">
-        <button id="insertBtn" title="선택한 칸 뒤에 빈 칸을 넣고, 이후 음들을 한 칸씩 뒤로 밀어요">＋ 뒤에 삽입</button>
+        <button id="insertBtn" title="선택한 칸 뒤에 이음(－)을 넣고, 이후 음들을 한 칸씩 뒤로 밀어요 · 단축키: =">＋ 뒤에 삽입</button>
         <button id="splitBtn" title="선택한 한 칸을 0.5칸씩 좌우로 나눠요">⟷ 나누기</button>
         <button id="mergeBtn" title="인접한 0.5칸 두 개를 한 칸으로 합쳐요">⟶⟵ 병합</button>
         <button id="chordBtn" title="선택한 음에 화음(작은 숫자, 최대 3개) 추가 · 재생 시 제외 · Shift+H">♫ 화음</button>
@@ -1571,13 +1571,7 @@
     pushHistory();
     markDirty();
     const newCell = {
-      type: 'rest',
-      value: '0',
-      octave: 0,
-      duration: currentInput.duration,
-      dot: currentInput.dot,
-      color: currentInput.color,
-      bold: currentInput.bold,
+      type: 'dash',
       lyric: ''
     };
     cells.splice(selectedIndex + 1, 0, newCell);
@@ -1897,7 +1891,7 @@
       bar.addEventListener('click', () => {
         playGuzhengString(str);
         pushRecordHistory();
-        recordedNotes.push({ type: 'note', value: String(str.degree), octave: str.octave, transposed: recordTranspose !== 0 });
+        recordedNotes.push({ type: 'note', value: String(str.degree), octave: str.octave, transposed: recordTranspose !== 0, transposeAmount: recordTranspose });
         updateRecordedPreview();
         bar.classList.add('playing');
         setTimeout(() => bar.classList.remove('playing'), 150);
@@ -1940,6 +1934,7 @@
         duration: currentInput.duration,
         dot: false,
         color: n.transposed ? 'red' : currentInput.color,
+        accidental: n.transposed ? (n.transposeAmount > 0 ? 'sharp' : 'flat') : null,
         bold: false,
         lyric: ''
       };
@@ -2705,7 +2700,8 @@
     { key: '-', desc: '이음줄 삽입' },
     { key: '|', desc: '마디선 삽입' },
     { key: 'Enter', desc: '줄바꿈' },
-    { key: '0~7', desc: '숫자(음) · 쉼표(0) 입력' }
+    { key: '0~7', desc: '숫자(음) · 쉼표(0) 입력' },
+    { key: '= (+)', desc: '선택한 칸 뒤에 이음(－) 삽입' }
   ];
   function showShortcutListPanel(){
     commandListPanel.innerHTML = '';
@@ -2986,6 +2982,9 @@
     } else if(e.key === '|'){
       e.preventDefault();
       insertBar();
+    } else if(e.key === '=' || e.key === '+'){
+      e.preventDefault();
+      insertAfterSelected();
     } else if(e.key === 'Enter'){
       insertBreak();
     } else if(e.key === 'F1'){
