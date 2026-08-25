@@ -2270,19 +2270,6 @@
     el.appendChild(lyric);
 
     el.addEventListener('click', (e) => { e.stopPropagation(); selectCell(voice, i, e.shiftKey, e.ctrlKey || e.metaKey); });
-    if(cell.type === 'note'){
-      el.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if(activeVoice !== voice || selectedIndex !== i){
-          focusVoice(voice);
-          selectedIndex = i;
-          rangeEndIndex = null;
-          extraSelected.clear();
-        }
-        changeOctave(e.deltaY < 0 ? 1 : -1);
-      }, { passive: false });
-    }
     return el;
   }
 
@@ -2790,7 +2777,7 @@
     { key: 'Shift+F', desc: '손가락 번호 입력창 열기' },
     { key: 'Shift+H', desc: '화음 번호 입력창 열기' },
     { key: 'Shift+S', desc: '파일 불러오기 (.json)' },
-    { key: '/ (빠르게 3번)', desc: '선택한 음에 /// 摇指 적용/해제' },
+    { key: '/', desc: '마디선 삽입 (한 번), /// 摇指 적용/해제 (빠르게 3번)' },
     { key: 'Space', desc: '재생 / 일시정지' },
     { key: 'Ctrl+Space', desc: '화음 포함 재생 / 일시정지' },
     { key: 'Space 두 번(빠르게)', desc: '정지' },
@@ -2798,7 +2785,7 @@
     { key: '↑ / ↓', desc: '옥타브 올림 / 내림' },
     { key: 'Backspace / Delete', desc: '선택한 칸(또는 마지막 칸) 삭제' },
     { key: '-', desc: '이음줄 삽입' },
-    { key: '|', desc: '마디선 삽입' },
+    { key: '|', desc: '마디선 삽입 (/ 한 번과 동일)' },
     { key: 'Enter', desc: '줄바꿈' },
     { key: '0~7', desc: '숫자(음) · 쉼표(0) 입력' },
     { key: '= (+)', desc: '선택한 칸 뒤에 이음(－) 삽입' }
@@ -3203,10 +3190,16 @@
       e.preventDefault();
       slashPressCount++;
       clearTimeout(slashPressTimer);
-      slashPressTimer = setTimeout(() => { slashPressCount = 0; }, 600);
       if(slashPressCount >= 3){
         slashPressCount = 0;
         toggleYaozhi();
+      } else {
+        slashPressTimer = setTimeout(() => {
+          if(slashPressCount > 0 && slashPressCount < 3){
+            insertBar();
+          }
+          slashPressCount = 0;
+        }, 400);
       }
     } else if((e.ctrlKey || e.metaKey) && (e.key === ' ' || e.code === 'Space')){
       e.preventDefault();
