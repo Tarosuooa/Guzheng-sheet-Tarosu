@@ -496,7 +496,6 @@
   }
   .page:first-child{ padding-top: 16mm; height: calc(297mm - var(--tb-h, 0px)); }
   .page + .page{ margin-top: 26px; }
-  body.two-row-mode .page:first-child{ height: auto; }
   .page-header{
     display:flex;
     justify-content:space-between;
@@ -838,7 +837,6 @@
       max-width: none;
     }
     .page:first-child{ height: calc(297mm - var(--tb-h, 0px)); }
-    body.two-row-mode .page:first-child{ height: auto !important; }
     .page + .page{ margin-top:0; }
     .page:last-child{ page-break-after: auto; }
     @page{ size: A4; margin: 0; }
@@ -2445,15 +2443,19 @@
     for(let i = 0; i < systemCountTotal; i++){
       const u = upperRows[i] || null;
       const l = twoRowMode ? (lowerRows[i] || null) : null;
+      // Systems stack upper+lower voices vertically (see .staff-wrap: flex-direction:column,
+      // gap:10px, plus .lower-voice-canvas padding-top:12px) -- true system height is the SUM
+      // of both voices' heights plus that spacing, not just the taller of the two.
+      const stackingSpace = (u && l) ? 22 : 0; // 10px flex gap + 12px lower-voice-canvas padding-top
       systemRows.push({
-        height: Math.max(u ? u.height : 0, l ? l.height : 0),
+        height: (u ? u.height : 0) + (l ? l.height : 0) + stackingSpace,
         upper: u,
         lower: l
       });
     }
 
     let firstPageMaxRows = rowsPerPage;
-    if(pageContentBox.height > 0 && !twoRowMode){
+    if(pageContentBox.height > 0){
       const firstPageBudget = Math.max(0, pageContentBox.height - titleblockHeight);
       firstPageMaxRows = countRowsForHeight(systemRows, firstPageBudget, rowsPerPage);
     }
