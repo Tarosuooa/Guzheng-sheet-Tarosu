@@ -2371,7 +2371,10 @@
     });
 
     document.body.removeChild(wrap);
-    return rows;
+    // Filter out phantom rows with no real content height -- e.g. a trailing 'break'
+    // (줄바꿈) cell with nothing after it still forces a new flex line via flex-basis:100%,
+    // but that line has zero height and must not count as a real system for pagination.
+    return rows.filter(r => r.height > 0);
   }
 
   function paginateRows(rows, firstPageMaxRows, rowsPerPage){
