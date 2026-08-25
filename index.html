@@ -2449,7 +2449,7 @@
     }
 
     let firstPageMaxRows = rowsPerPage;
-    if(pageContentBox.height > 0){
+    if(pageContentBox.height > 0 && !twoRowMode){
       const firstPageBudget = Math.max(0, pageContentBox.height - titleblockHeight);
       firstPageMaxRows = countRowsForHeight(systemRows, firstPageBudget, rowsPerPage);
     }
