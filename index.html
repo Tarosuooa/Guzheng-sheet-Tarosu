@@ -838,6 +838,7 @@
       max-width: none;
     }
     .page:first-child{ height: calc(297mm - var(--tb-h, 0px)); }
+    body.two-row-mode .page:first-child{ height: auto !important; }
     .page + .page{ margin-top:0; }
     .page:last-child{ page-break-after: auto; }
     @page{ size: A4; margin: 0; }
@@ -2952,7 +2953,12 @@
     }
   });
 
+  let isPrinting = false;
+  window.addEventListener('beforeprint', () => { isPrinting = true; });
+  window.addEventListener('afterprint', () => { isPrinting = false; });
+
   window.addEventListener('resize', () => {
+    if(isPrinting) return; // don't recompute pagination using print-context measurements
     clearTimeout(window.__resizeT);
     window.__resizeT = setTimeout(() => { pageContentBox = null; render(); }, 200);
   });
@@ -3398,8 +3404,10 @@
     let tbResizeTimer = null;
     let lastTbH = null;
     const tbResizeObserver = new ResizeObserver(() => {
+      if(isPrinting) return;
       clearTimeout(tbResizeTimer);
       tbResizeTimer = setTimeout(() => {
+        if(isPrinting) return;
         const h = titleblockEl.getBoundingClientRect().height;
         if(lastTbH !== null && Math.abs(h - lastTbH) < 0.5) return; // no real change, avoid redundant re-render
         lastTbH = h;
