@@ -1228,7 +1228,7 @@
         if(playChords && cell.type === 'note' && !cell.repeat && cell.chord && cell.chord.length){
           chordFreqs = cell.chord.map(d => noteFrequency(parseInt(d, 10), (cell.octave || 0) - 1, keySemi, null));
         }
-        const ev = { cellIndex: idx, time: t, duration: durSec, freq, isRest: cell.type === 'rest', chordFreqs };
+        const ev = { cellIndex: idx, time: t, duration: durSec, freq, isRest: cell.type === 'rest', chordFreqs, tremolo: cell.type === 'note' && !!cell.yaozhi };
         seq.push(ev);
         lastEvent = ev;
         t += durSec;
@@ -1236,8 +1236,12 @@
         const durSec = 1 * beatSec;
         if(lastEvent) lastEvent.duration += durSec;
         t += durSec;
+      } else if(cell.type === 'bar'){
+        const durSec = 2 * beatSec; // bar line holds for 2x a dash's duration
+        if(lastEvent) lastEvent.duration += durSec;
+        t += durSec;
       }
-      // 'bar' and 'break' cells take no playback time
+      // 'break' cells take no playback time
     });
     return { seq, totalTime: t };
   }
@@ -1266,14 +1270,14 @@
     return { seq, totalTime };
   }
 
-  function playTone(freq, durationSec){
+  function playTone(freq, durationSec, minDecay){
     const now = audioCtx.currentTime;
     const osc = audioCtx.createOscillator();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(freq, now);
 
     const gain = audioCtx.createGain();
-    const decayTime = Math.min(Math.max(durationSec * 0.9, 0.15), 2.2);
+    const decayTime = Math.min(Math.max(durationSec * 0.9, minDecay !== undefined ? minDecay : 0.15), 2.2);
     const peak = Math.max(0.0001, masterVolume * 0.4);
     gain.gain.setValueAtTime(0.0001, now);
     gain.gain.exponentialRampToValueAtTime(peak, now + 0.008);
@@ -1302,10 +1306,36 @@
   function schedulePlayback(){
     clearScheduledTimers();
     const effectiveEnd = (playEndOffset !== null && playEndOffset !== undefined) ? playEndOffset : playTotalTime;
+    const TREMOLO_INTERVAL = 0.08; // seconds per re-strike, ~12.5 strikes/sec
     playSequence.forEach(ev => {
       if(ev.time + ev.duration <= playStartOffset) return;
       if(ev.time >= effectiveEnd) return;
       const delay = Math.max(0, ev.time - playStartOffset);
+
+      if(ev.tremolo && !ev.isRest && ev.freq){
+        const repeatCount = Math.max(4, Math.round(ev.duration / TREMOLO_INTERVAL));
+        const partDur = ev.duration / repeatCount;
+        for(let k = 0; k < repeatCount; k++){
+          const partTime = ev.time + k * partDur;
+          if(partTime < playStartOffset || partTime >= effectiveEnd) continue;
+          const partDelay = partTime - playStartOffset;
+          const id = setTimeout(() => {
+            if(playState !== 'playing') return;
+            if(k === 0) highlightPlayingCell(ev.cellIndex, ev.voice);
+            playTone(ev.freq, partDur, 0.035);
+          }, partDelay * 1000);
+          scheduledTimers.push(id);
+        }
+        if(ev.chordFreqs){
+          const id = setTimeout(() => {
+            if(playState !== 'playing') return;
+            ev.chordFreqs.forEach(f => playTone(f, ev.duration));
+          }, delay * 1000);
+          scheduledTimers.push(id);
+        }
+        return;
+      }
+
       const id = setTimeout(() => {
         if(playState !== 'playing') return;
         highlightPlayingCell(ev.cellIndex, ev.voice);
