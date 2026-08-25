@@ -2241,6 +2241,19 @@
     el.appendChild(lyric);
 
     el.addEventListener('click', (e) => { e.stopPropagation(); selectCell(voice, i, e.shiftKey, e.ctrlKey || e.metaKey); });
+    if(cell.type === 'note'){
+      el.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if(activeVoice !== voice || selectedIndex !== i){
+          focusVoice(voice);
+          selectedIndex = i;
+          rangeEndIndex = null;
+          extraSelected.clear();
+        }
+        changeOctave(e.deltaY < 0 ? 1 : -1);
+      }, { passive: false });
+    }
     return el;
   }
 
@@ -2958,6 +2971,56 @@
   const memoLine2El = document.getElementById('memoLine2Input');
   [memoLine1El, memoLine2El].forEach(el => {
     el.addEventListener('input', () => { markDirty(); pageContentBox = null; render(); });
+  });
+
+  const MEMO_OCTAVE_ABOVE = '\u{1F538}'; // 🔸 small orange diamond - above octave, placed BEFORE the digit
+  const MEMO_OCTAVE_BELOW = '\u{1F539}'; // 🔹 small blue diamond - below octave, placed AFTER the digit
+  function adjustMemoOctave(inputEl, digitStart, deltaSign){
+    const digitChar = inputEl.value[digitStart];
+    if(!digitChar || !/[0-9]/.test(digitChar)) return null;
+
+    // emoji markers are surrogate pairs (2 UTF-16 code units each)
+    let beforePos = digitStart;
+    let aboveCount = 0;
+    while(beforePos >= 2 && inputEl.value.slice(beforePos - 2, beforePos) === MEMO_OCTAVE_ABOVE){
+      aboveCount++; beforePos -= 2;
+    }
+
+    let afterPos = digitStart + 1;
+    let belowCount = 0;
+    while(inputEl.value.slice(afterPos, afterPos + 2) === MEMO_OCTAVE_BELOW){
+      belowCount++; afterPos += 2;
+    }
+
+    const level = aboveCount - belowCount;
+    const newLevel = clamp(level + deltaSign, -2, 2);
+    const beforeMarks = newLevel > 0 ? MEMO_OCTAVE_ABOVE.repeat(newLevel) : '';
+    const afterMarks = newLevel < 0 ? MEMO_OCTAVE_BELOW.repeat(-newLevel) : '';
+
+    inputEl.value = inputEl.value.slice(0, beforePos) + beforeMarks + digitChar + afterMarks + inputEl.value.slice(afterPos);
+    const newDigitStart = beforePos + beforeMarks.length;
+    inputEl.setSelectionRange(newDigitStart, newDigitStart + 1 + afterMarks.length);
+    return newDigitStart;
+  }
+  let memoOctaveSession = null; // { el, digitStart, time }
+  [memoLine1El, memoLine2El].forEach(el => {
+    el.addEventListener('wheel', (e) => {
+      const now = Date.now();
+      let digitStart;
+      if(memoOctaveSession && memoOctaveSession.el === el && (now - memoOctaveSession.time) < 600){
+        digitStart = memoOctaveSession.digitStart;
+      } else {
+        const start = el.selectionStart, end = el.selectionEnd;
+        if(start === null || end === null || end <= start || !/[0-9]/.test(el.value[start] || '')) return;
+        digitStart = start;
+      }
+      e.preventDefault();
+      const newDigitStart = adjustMemoOctave(el, digitStart, e.deltaY < 0 ? 1 : -1);
+      if(newDigitStart !== null){
+        markDirty();
+        memoOctaveSession = { el, digitStart: newDigitStart, time: now };
+      }
+    }, { passive: false });
   });
 
   if(mobileKeyInput){
