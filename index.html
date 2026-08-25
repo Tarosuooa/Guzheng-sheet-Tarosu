@@ -70,6 +70,8 @@
   }
   .credit-row{
     display:flex;
+    flex-wrap: wrap;
+    row-gap: 4px;
     margin-bottom: 14px;
   }
   .credit-input{
@@ -82,7 +84,47 @@
     width: 220px;
   }
   .credit-input::placeholder{ color: var(--header-text-faint); }
+  .memo-input{
+    background: transparent;
+    border: none;
+    color: var(--header-text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 12px;
+    padding: 2px 2px;
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: 393px;
+    box-sizing: border-box;
+    text-align: right;
+    margin-left: auto;
+  }
+  .memo-input::placeholder{ color: var(--header-text-faint); }
+  .memo-input:focus{ outline: none; }
+  .memo-row-1{ align-items: center; }
+  .subtitle-row .memo-input{
+    background: transparent;
+    border: none;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 12px;
+    padding: 2px 2px;
+    border-radius: 0;
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: 393px;
+    text-align: right;
+  }
+  .subtitle-row .memo-input:focus{ outline: none; }
   .credit-input:focus{ outline:none; }
+  .titleblock input:-webkit-autofill,
+  .titleblock input:-webkit-autofill:hover,
+  .titleblock input:-webkit-autofill:focus,
+  .titleblock input:-webkit-autofill:active{
+    -webkit-text-fill-color: var(--header-text);
+    -webkit-box-shadow: 0 0 0px 1000px transparent inset;
+    box-shadow: 0 0 0px 1000px transparent inset;
+    transition: background-color 9999s ease-in-out 0s, color 9999s ease-in-out 0s;
+    caret-color: var(--header-text);
+  }
   .subtitle-row{
     display:flex;
     flex-wrap: wrap;
@@ -770,10 +812,17 @@
     .app{ max-width:100%; padding:0; }
     .toolbar, .page-header{ display:none; }
     .titleblock{ border-radius:0; text-align:right; }
+    .memo-input:placeholder-shown{ visibility: hidden; }
     .titleblock .credit-row{ justify-content:flex-end; }
     .titleblock .credit-input{ text-align:right; }
     .contact-tag{ top: calc(var(--tb-sub-bottom, 100px) + 8px); }
     .titleblock .subtitle-row{ justify-content:flex-end; }
+    .memo-row-1 .memo-input, .subtitle-row .memo-input{
+      order: -1;
+      margin-left: 0;
+      margin-right: auto;
+      text-align: left;
+    }
     .paper-wrap{ padding:0; border:none; background:#fff; display:block; }
     #pagesContainer{ display:block; }
     .page{
@@ -803,13 +852,15 @@
     <div class="credit-row">
       <input id="creditInput" placeholder="가수 / 작곡가" class="credit-input">
     </div>
-    <div class="credit-row">
+    <div class="credit-row memo-row-1">
       <input id="producerInput" placeholder="악보 작성자" class="credit-input">
+      <input id="memoLine1Input" placeholder="메모(1)" class="memo-input" maxlength="35">
     </div>
-    <div class="subtitle-row" id="subtitleRow">
+    <div class="subtitle-row memo-row-2" id="subtitleRow">
       <span id="keyFieldWrap"><label for="keyInput">장조</label><input id="keyInput" value="D"></span>
       <span id="timeFieldWrap"><label for="timeInput">박자</label><input id="timeInput" value="4/4"></span>
       <span id="tempoFieldWrap"><label for="tempoInput">템포 ♩ =</label><input id="tempoInput" value="120"></span>
+      <input id="memoLine2Input" placeholder="메모(2)" class="memo-input memo-input-2" maxlength="35">
     </div>
     <span class="contact-tag" hidden>contact: tarosu.ooa@gmail.com</span>
   </header>
@@ -2896,6 +2947,19 @@
     el.addEventListener(evt, () => { markDirty(); pageContentBox = null; render(); });
   });
 
+  document.getElementById('titleInput').addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, text);
+  });
+
+  // ---------- Memo (two independent lines, each capped by maxlength) ----------
+  const memoLine1El = document.getElementById('memoLine1Input');
+  const memoLine2El = document.getElementById('memoLine2Input');
+  [memoLine1El, memoLine2El].forEach(el => {
+    el.addEventListener('input', () => { markDirty(); pageContentBox = null; render(); });
+  });
+
   if(mobileKeyInput){
     mobileKeyInput.addEventListener('input', (e) => {
       if(e.inputType === 'deleteContentBackward'){
@@ -3074,6 +3138,8 @@
       title: document.getElementById('titleInput').textContent.trim(),
       credit: document.getElementById('creditInput').value,
       producer: document.getElementById('producerInput').value,
+      memo1: document.getElementById('memoLine1Input').value,
+      memo2: document.getElementById('memoLine2Input').value,
       key: document.getElementById('keyInput').value,
       time: document.getElementById('timeInput').value,
       tempo: document.getElementById('tempoInput').value,
@@ -3173,6 +3239,8 @@
       document.getElementById('titleInput').textContent = data.title || '제목을 입력하세요';
       document.getElementById('creditInput').value = data.credit || '';
       document.getElementById('producerInput').value = data.producer || '';
+      document.getElementById('memoLine1Input').value = data.memo1 || '';
+      document.getElementById('memoLine2Input').value = data.memo2 || '';
       document.getElementById('keyInput').value = data.key || 'D';
       document.getElementById('timeInput').value = data.time || '4/4';
       document.getElementById('tempoInput').value = data.tempo || '120';
