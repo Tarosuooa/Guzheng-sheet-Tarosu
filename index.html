@@ -3389,6 +3389,23 @@
       render();
     });
   }
+
+  if(window.ResizeObserver){
+    const titleblockEl = document.querySelector('.titleblock');
+    let tbResizeTimer = null;
+    let lastTbH = null;
+    const tbResizeObserver = new ResizeObserver(() => {
+      clearTimeout(tbResizeTimer);
+      tbResizeTimer = setTimeout(() => {
+        const h = titleblockEl.getBoundingClientRect().height;
+        if(lastTbH !== null && Math.abs(h - lastTbH) < 0.5) return; // no real change, avoid redundant re-render
+        lastTbH = h;
+        pageContentBox = null;
+        render();
+      }, 80);
+    });
+    tbResizeObserver.observe(titleblockEl);
+  }
 })();
 </script>
 </body>
