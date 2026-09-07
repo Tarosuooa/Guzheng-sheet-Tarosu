@@ -621,6 +621,19 @@
   }
 
   .oct-row{ display:flex; gap:2px; height:8px; align-items:center; }
+  .technique-mark-row{
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    height: 11px;
+    line-height: 1;
+  }
+  .technique-mark{
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--ink);
+  }
   .oct-row-below{ position: relative; top: -4px; }
   .oct-dot{ width:4px; height:4px; border-radius:50%; background: var(--accent); }
   .oct-dot-below{ background: #2E5FA3; }
@@ -694,12 +707,36 @@
     margin-top: -3px;
     pointer-events: none;
   }
-  .chord-notes span{
+  .chord-note-wrap{
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .chord-note-wrap span{
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px;
     font-weight: 700;
     color: var(--ink-soft);
   }
+  .chord-oct-dots{
+    display: flex;
+    gap: 1px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .chord-oct-dots-above{ bottom: 100%; margin-bottom: 1px; }
+  .chord-oct-dots-below{ top: 100%; margin-top: 1px; }
+  .chord-oct-dots i{
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: block;
+    font-style: normal;
+  }
+  .chord-oct-dots-below i{ background: #2E5FA3; }
 
   .lyric-input{
     margin-top: 6px;
@@ -780,6 +817,8 @@
     .finger-mark{ font-size: 7px; top: -2px; left: -7px; }
     .yaozhi-mark{ font-size: 8px; bottom: 0; left: -7px; letter-spacing: -1.5px; transform: scaleY(0.6); transform-origin: bottom left; }
     .oct-row{ height: 6px; }
+    .technique-mark-row{ height: 9px; }
+    .technique-mark{ font-size: 9px; }
     .oct-dot{ width:3px; height:3px; }
     .underlines{ width: 15px; top: -2px; }
     .underline{ height: 1.5px; }
@@ -1024,7 +1063,7 @@
 
   <div id="chordPanel" class="command-list-panel lyrics-modal" hidden>
     <div class="cmd-item lyrics-panel-body">
-      <div class="lyrics-panel-desc">화음으로 넣을 작은 숫자를 입력하세요 (최대 3개, 1~7만 가능. 예: 35)</div>
+      <div class="lyrics-panel-desc">화음으로 넣을 작은 숫자를 입력하세요 (최대 3개, 1~7만 가능). 숫자 뒤에 +는 옥타브 올림, -는 옥타브 내림 (최대 ±2). 예: 3+5--7</div>
       <input type="text" id="chordPanelInput" class="command-input lyrics-panel-input" placeholder="예: 35" autocomplete="off">
       <button id="chordApplyBtn">적용</button>
     </div>
@@ -1226,7 +1265,12 @@
         const freq = (cell.type === 'note' && !cell.repeat) ? noteFrequency(parseInt(cell.value, 10), cell.octave || 0, keySemi, cell.accidental) : null;
         let chordFreqs = null;
         if(playChords && cell.type === 'note' && !cell.repeat && cell.chord && cell.chord.length){
-          chordFreqs = cell.chord.map(d => noteFrequency(parseInt(d, 10), (cell.octave || 0) - 1, keySemi, null));
+          chordFreqs = cell.chord.map(c => {
+            if(typeof c === 'string'){
+              return noteFrequency(parseInt(c, 10), (cell.octave || 0) - 1, keySemi, null);
+            }
+            return noteFrequency(parseInt(c.value, 10), c.octave || 0, keySemi, null);
+          });
         }
         const ev = { cellIndex: idx, time: t, duration: durSec, freq, isRest: cell.type === 'rest', chordFreqs, tremolo: cell.type === 'note' && !!cell.yaozhi };
         seq.push(ev);
@@ -1535,6 +1579,32 @@
     rangeEndIndex = insertAt + toInsert.length - 1;
     render();
   }
+  function parseChordInput(text){
+    const result = [];
+    const re = /[1-7][+\-]*/g;
+    let m;
+    while((m = re.exec(text)) && result.length < 3){
+      const digit = m[0][0];
+      const modifiers = m[0].slice(1);
+      let octave = 0;
+      for(const ch of modifiers){
+        if(ch === '+') octave++;
+        else if(ch === '-') octave--;
+      }
+      octave = clamp(octave, -2, 2);
+      result.push({ value: digit, octave });
+    }
+    return result;
+  }
+  function chordToText(chordArr){
+    if(!chordArr) return '';
+    return chordArr.map(c => {
+      const digit = typeof c === 'string' ? c : c.value;
+      const octave = typeof c === 'string' ? 0 : (c.octave || 0);
+      const mod = octave > 0 ? '+'.repeat(octave) : (octave < 0 ? '-'.repeat(-octave) : '');
+      return digit + mod;
+    }).join('');
+  }
   function openChordPanel(){
     const idxs = getSelectedIndices();
     const noteIdxs = idxs.filter(i => cells[i] && cells[i].type === 'note');
@@ -1546,7 +1616,7 @@
     const panelInput = document.getElementById('chordPanelInput');
     panel.hidden = false;
     // Pre-fill only when a single note is selected; for multiple, start blank so all get the same new value.
-    panelInput.value = noteIdxs.length === 1 ? (cells[noteIdxs[0]].chord || []).join('') : '';
+    panelInput.value = noteIdxs.length === 1 ? chordToText(cells[noteIdxs[0]].chord) : '';
     panelInput.focus();
     panelInput.select();
   }
@@ -1560,10 +1630,10 @@
       panelInput.blur();
       return;
     }
-    const digits = panelInput.value.replace(/[^1-7]/g, '').slice(0, 3).split('');
+    const parsed = parseChordInput(panelInput.value);
     pushHistory();
     markDirty();
-    noteIdxs.forEach(i => { cells[i].chord = digits.slice(); });
+    noteIdxs.forEach(i => { cells[i].chord = parsed.map(c => ({ value: c.value, octave: c.octave })); });
     render();
     panel.hidden = true;
     panelInput.blur();
@@ -1827,6 +1897,19 @@
     pushHistory();
     markDirty();
     noteIdxs.forEach(i => { cells[i].repeat = !allMarked; });
+    render();
+  }
+  function setTechniqueMark(markChar){
+    const idxs = getSelectedIndices();
+    const noteIdxs = idxs.filter(i => cells[i] && cells[i].type === 'note');
+    if(!noteIdxs.length){
+      alert('주법을 표시할 음을 먼저 선택해주세요.');
+      return;
+    }
+    const allMarked = noteIdxs.every(i => cells[i].techniqueMark === markChar);
+    pushHistory();
+    markDirty();
+    noteIdxs.forEach(i => { cells[i].techniqueMark = allMarked ? null : markChar; });
     render();
   }
   // ---------- 녹음 (guzheng recording interface) ----------
@@ -2182,6 +2265,19 @@
     el.dataset.cellIndex = i;
     el.dataset.voice = voice;
 
+    const techniqueMarkRow = document.createElement('div');
+    techniqueMarkRow.className = 'technique-mark-row';
+    if(cell.type === 'note' && cell.techniqueMark){
+      const markSpan = document.createElement('span');
+      markSpan.className = 'technique-mark';
+      markSpan.textContent = cell.techniqueMark;
+      if(cell.color && cell.color !== 'black'){
+        markSpan.style.color = COLOR_MAP[cell.color] || '';
+      }
+      techniqueMarkRow.appendChild(markSpan);
+    }
+    el.appendChild(techniqueMarkRow);
+
     const octAbove = document.createElement('div');
     octAbove.className = 'oct-row';
     const octBelowWrap = document.createElement('div');
@@ -2250,10 +2346,27 @@
     if(cell.type === 'note' && cell.chord && cell.chord.length){
       const chordEl = document.createElement('div');
       chordEl.className = 'chord-notes';
-      cell.chord.slice(0, 3).forEach(digit => {
-        const span = document.createElement('span');
-        span.textContent = digit;
-        chordEl.appendChild(span);
+      cell.chord.slice(0, 3).forEach(c => {
+        const digit = typeof c === 'string' ? c : c.value;
+        const octave = typeof c === 'string' ? 0 : (c.octave || 0);
+        const wrap = document.createElement('span');
+        wrap.className = 'chord-note-wrap';
+        if(octave > 0){
+          const dotsAbove = document.createElement('span');
+          dotsAbove.className = 'chord-oct-dots chord-oct-dots-above';
+          for(let k = 0; k < octave; k++){ dotsAbove.appendChild(document.createElement('i')); }
+          wrap.appendChild(dotsAbove);
+        }
+        const digitSpan = document.createElement('span');
+        digitSpan.textContent = digit;
+        wrap.appendChild(digitSpan);
+        if(octave < 0){
+          const dotsBelow = document.createElement('span');
+          dotsBelow.className = 'chord-oct-dots chord-oct-dots-below';
+          for(let k = 0; k < -octave; k++){ dotsBelow.appendChild(document.createElement('i')); }
+          wrap.appendChild(dotsBelow);
+        }
+        chordEl.appendChild(wrap);
       });
       el.appendChild(chordEl);
     }
@@ -2678,7 +2791,33 @@
   document.getElementById('fingerBtn').addEventListener('click', (e) => { e.stopPropagation(); openFingerPanel(); });
   const TECHNIQUES = [
     { label: '/// 摇指', apply: toggleYaozhi },
-    { label: '↻ 반복', apply: toggleRepeat }
+    { label: '↻ 반복', apply: toggleRepeat },
+    { label: '└ 托', apply: () => setTechniqueMark('└') },
+    { label: '＼ 抹', apply: () => setTechniqueMark('＼') },
+    { label: '⌒ 勾', apply: () => setTechniqueMark('⌒') },
+    { label: 'Λ 打', apply: () => setTechniqueMark('Λ') },
+    { label: '┐ 劈', apply: () => setTechniqueMark('┐') },
+    { label: '/ 挑', apply: () => setTechniqueMark('/') },
+    { label: ') 剔', apply: () => setTechniqueMark(')') },
+    { label: 'ㄅ 提', apply: () => setTechniqueMark('ㄅ') },
+    { label: '匚 大撮', apply: () => setTechniqueMark('匚') },
+    { label: '< 小撮', apply: () => setTechniqueMark('<') },
+    { label: '└└ 双托', apply: () => setTechniqueMark('└└') },
+    { label: '＼＼ 双抹', apply: () => setTechniqueMark('＼＼') },
+    { label: '⌒⌒ 双勾', apply: () => setTechniqueMark('⌒⌒') },
+    { label: '┐┐ 双劈', apply: () => setTechniqueMark('┐┐') },
+    { label: '❋ 轮', apply: () => setTechniqueMark('❋') },
+    { label: '⌇ 琶', apply: () => setTechniqueMark('⌇') },
+    { label: '⬆ 扫', apply: () => setTechniqueMark('⬆') },
+    { label: '↘ 刮', apply: () => setTechniqueMark('↘') },
+    { label: '* 花', apply: () => setTechniqueMark('*') },
+    { label: '○ 泛', apply: () => setTechniqueMark('○') },
+    { label: '﹋ 颤', apply: () => setTechniqueMark('﹋') },
+    { label: '﹋﹋ 重颤', apply: () => setTechniqueMark('﹋﹋') },
+    { label: '〰 揉', apply: () => setTechniqueMark('〰') },
+    { label: '↷ 上滑', apply: () => setTechniqueMark('↷') },
+    { label: '⤹ 下滑', apply: () => setTechniqueMark('⤹') },
+    { label: '↷⤹ 回滑', apply: () => setTechniqueMark('↷⤹') }
   ];
   function showTechniquePanel(){
     const panel = document.getElementById('techniquePanel');
