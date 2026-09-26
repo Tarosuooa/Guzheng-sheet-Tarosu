@@ -1281,9 +1281,14 @@
         if(lastEvent) lastEvent.duration += durSec;
         t += durSec;
       } else if(cell.type === 'bar'){
-        const durSec = 2 * beatSec; // bar line holds for 2x a dash's duration
-        if(lastEvent) lastEvent.duration += durSec;
-        t += durSec;
+        // Only extend playback duration for bar lines in single-row (1행) mode. In 2행 (two-voice)
+        // mode, upper/lower cells are separate arrays; a bar line present in only one voice would
+        // push that voice's timeline out of sync with the other, so bars stay purely visual there.
+        if(!twoRowMode){
+          const durSec = 2 * beatSec; // bar line holds for 2x a dash's duration
+          if(lastEvent) lastEvent.duration += durSec;
+          t += durSec;
+        }
       }
       // 'break' cells take no playback time
     });
